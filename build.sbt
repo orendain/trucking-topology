@@ -1,6 +1,6 @@
 name := "truckingTopology"
 
-version := "1.0"
+version := "0.1"
 
 organization := "com.hortonworks.orendainx"
 

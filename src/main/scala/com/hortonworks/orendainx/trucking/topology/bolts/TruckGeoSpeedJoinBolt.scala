@@ -1,8 +1,8 @@
-package com.hortonworks.orendainx.truck.topology.bolts
+package com.hortonworks.orendainx.trucking.topology.bolts
 
 import java.util
 
-import com.hortonworks.orendainx.truck.topology.models.{TruckGeoEvent, TruckGeoSpeedEvent, TruckSpeedEvent}
+import com.hortonworks.orendainx.trucking.topology.models.{TruckGeoEvent, TruckGeoSpeedEvent, TruckSpeedEvent}
 import org.apache.storm.task.{OutputCollector, TopologyContext}
 import org.apache.storm.topology.OutputFieldsDeclarer
 import org.apache.storm.topology.base.BaseWindowedBolt

@@ -1,4 +1,4 @@
-package com.hortonworks.orendainx.truck.topology.models
+package com.hortonworks.orendainx.trucking.topology.models
 
 import java.sql.Timestamp
 

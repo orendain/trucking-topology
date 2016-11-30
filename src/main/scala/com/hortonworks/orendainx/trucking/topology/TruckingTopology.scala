@@ -1,13 +1,11 @@
-package com.hortonworks.orendainx.truck.topology
+package com.hortonworks.orendainx.trucking.topology
 
-import com.typesafe.config.ConfigFactory
-import com.typesafe.config.{Config => TypeConfig}
 import java.util.Properties
 
-import com.hortonworks.orendainx.truck.topology.bolts.TruckGeoSpeedJoinBolt
-import com.hortonworks.orendainx.truck.topology.schemes.{TruckGeoScheme, TruckSpeedScheme}
+import com.hortonworks.orendainx.trucking.topology.bolts.TruckGeoSpeedJoinBolt
+import com.hortonworks.orendainx.trucking.topology.schemes.{TruckGeoScheme, TruckSpeedScheme}
+import com.typesafe.config.{ConfigFactory, Config => TypeConfig}
 import org.apache.storm.generated.StormTopology
-import org.apache.storm.{Config, StormSubmitter}
 import org.apache.storm.hbase.bolt.HBaseBolt
 import org.apache.storm.hbase.bolt.mapper.SimpleHBaseMapper
 import org.apache.storm.kafka.bolt.KafkaBolt
@@ -18,11 +16,9 @@ import org.apache.storm.spout.SchemeAsMultiScheme
 import org.apache.storm.topology.TopologyBuilder
 import org.apache.storm.topology.base.BaseWindowedBolt
 import org.apache.storm.tuple.Fields
+import org.apache.storm.{Config, StormSubmitter}
 
 import scala.concurrent.duration._
-import org.apache.hadoop.hbase.HBaseConfiguration
-
-import scala.collection.immutable.HashMap
 
 /**
   * Companion object to [[TruckingTopology]] class.

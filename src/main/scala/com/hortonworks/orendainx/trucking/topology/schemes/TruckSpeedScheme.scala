@@ -1,4 +1,4 @@
-package com.hortonworks.orendainx.truck.topology.schemes
+package com.hortonworks.orendainx.trucking.topology.schemes
 
 import java.nio.ByteBuffer
 import java.sql.Timestamp
