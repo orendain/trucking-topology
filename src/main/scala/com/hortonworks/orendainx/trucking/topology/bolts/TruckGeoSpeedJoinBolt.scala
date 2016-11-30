@@ -1,17 +1,25 @@
-package com.hortonworks.orendainx.truck.topology
+package com.hortonworks.orendainx.truck.topology.bolts
 
 import java.util
+
+import com.hortonworks.orendainx.truck.topology.models.{TruckGeoEvent, TruckGeoSpeedEvent, TruckSpeedEvent}
 import org.apache.storm.task.{OutputCollector, TopologyContext}
 import org.apache.storm.topology.OutputFieldsDeclarer
 import org.apache.storm.topology.base.BaseWindowedBolt
 import org.apache.storm.tuple.Fields
 import org.apache.storm.windowing.TupleWindow
+
 import scala.collection.JavaConversions._
 
+/**
+  * Bolt responsible for joining geo and speed events into a single set of fields.
+  *
+  * @author Edgar Orendain <edgar@orendainx.com>
+  */
 class TruckGeoSpeedJoinBolt() extends BaseWindowedBolt {
 
   /*
-   * Definition and implicit
+   * Definition and implicit of type 'Values' that acts as a bridge between Scala and Storm's Java [[Values]]
    */
   class Values(val args: Any*)
   implicit def scalaValues2StormValues(v: Values): org.apache.storm.tuple.Values = {
@@ -22,9 +30,8 @@ class TruckGeoSpeedJoinBolt() extends BaseWindowedBolt {
   var collector: OutputCollector = _
 
   override def prepare(stormConf: util.Map[_, _], context: TopologyContext, collector: OutputCollector): Unit = {
-    // TODO: remove super calls? the call is a NOOP.  bring up in code review
+    // TODO: Code review: Best practice to keep in super calls? Even if the super call is a NOOP?
     super.prepare(stormConf, context, collector)
-
     this.collector = collector
   }
 

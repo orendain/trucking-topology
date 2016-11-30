@@ -1,11 +1,13 @@
-package com.hortonworks.orendainx.truck.topology
+package com.hortonworks.orendainx.truck.topology.models
 
 import java.sql.Timestamp
 
 import org.apache.storm.tuple.Tuple
 
 /**
-  * Created by Edgar Orendain on 11/19/16.
+  * Model for speed events.
+  *
+  * @author Edgar Orendain <edgar@orendainx.com>
   */
 case class TruckSpeedEvent(eventTime: Timestamp, truckId: Int, driverId: Int, driverName: String,
                            routeId: Int, routeName: String, speed: Int)

@@ -1,12 +1,13 @@
-package com.hortonworks.orendainx.truck.topology
+package com.hortonworks.orendainx.truck.topology.schemes
 
 import java.nio.ByteBuffer
-import org.apache.storm.tuple.{Fields, Values}
 import java.sql.Timestamp
 
-// TODO: consider re-structuring events ... would a geo device actually be signaling a speed violation?
-// TODO: and would a speed monitoring device know about the current druver and route? (meh, maybe - but prlly just truckID)
+import org.apache.storm.tuple.{Fields, Values}
+
 /**
+  * Scheme for parsing geo events.
+  *
   * @author Edgar Orendain <edgar@orendainx.com>
   */
 object TruckGeoScheme extends DelimitedScheme("\\|") {
@@ -26,7 +27,7 @@ object TruckGeoScheme extends DelimitedScheme("\\|") {
     val driverName = strings(4)
     val routeId = strings(5)
     val routeName = strings(6)
-    val status = strings(7) // TODO: was renamed from "eventType" ... find better title?
+    val status = strings(7) // TODO: was renamed from "eventType" ... better title?
     val latitude = strings(8)
     val longitude = strings(9)
     val correlationId = strings(10)

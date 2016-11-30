@@ -1,10 +1,13 @@
-package com.hortonworks.orendainx.truck.topology
+package com.hortonworks.orendainx.truck.topology.schemes
 
 import java.nio.ByteBuffer
-import org.apache.storm.tuple.{Fields, Values}
 import java.sql.Timestamp
 
+import org.apache.storm.tuple.{Fields, Values}
+
 /**
+  * Scheme for parsing speed events.
+  *
   * @author Edgar Orendain <edgar@orendainx.com>
   */
 object TruckSpeedScheme extends DelimitedScheme("\\|") {
