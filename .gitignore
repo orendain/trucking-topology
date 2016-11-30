@@ -1,0 +1,14 @@
+# SBT
+logs
+project/project
+project/target
+target
+tmp
+dist
+.cache
+
+# IntelliJ IDEA
+/.idea
+
+# Dang you, Macs
+.DS_Store
