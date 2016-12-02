@@ -3,6 +3,7 @@ package com.hortonworks.orendainx.trucking.topology.bolts
 import java.util
 
 import com.hortonworks.orendainx.trucking.topology.models.{TruckGeoEvent, TruckGeoSpeedEvent, TruckSpeedEvent}
+import com.typesafe.scalalogging.Logger
 import org.apache.storm.task.{OutputCollector, TopologyContext}
 import org.apache.storm.topology.OutputFieldsDeclarer
 import org.apache.storm.topology.base.BaseWindowedBolt
@@ -17,6 +18,8 @@ import scala.collection.JavaConversions._
   * @author Edgar Orendain <edgar@orendainx.com>
   */
 class TruckGeoSpeedJoinBolt() extends BaseWindowedBolt {
+
+  lazy val logger = Logger(this.getClass)
 
   /*
    * Definition and implicit of type 'Values' that acts as a bridge between Scala and Storm's Java [[Values]]
@@ -33,9 +36,13 @@ class TruckGeoSpeedJoinBolt() extends BaseWindowedBolt {
     // TODO: Code review: Best practice to keep in super calls? Even if the super call is a NOOP?
     super.prepare(stormConf, context, collector)
     this.collector = collector
+
+    logger.info("Preparations finished")
   }
 
   override def execute(inputWindow: TupleWindow): Unit = {
+
+    logger.info("Executing")
 
     // Extract all of the tuples from the TupleWindow
     val tuples = inputWindow.get().toList

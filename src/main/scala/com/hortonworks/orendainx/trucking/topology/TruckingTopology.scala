@@ -5,6 +5,7 @@ import java.util.Properties
 import com.hortonworks.orendainx.trucking.topology.bolts.TruckGeoSpeedJoinBolt
 import com.hortonworks.orendainx.trucking.topology.schemes.{TruckGeoScheme, TruckSpeedScheme}
 import com.typesafe.config.{ConfigFactory, Config => TypeConfig}
+import com.typesafe.scalalogging.Logger
 import org.apache.storm.generated.StormTopology
 import org.apache.storm.hbase.bolt.HBaseBolt
 import org.apache.storm.hbase.bolt.mapper.SimpleHBaseMapper
@@ -42,17 +43,17 @@ object TruckingTopology {
   val KafkaValueSerializer = "kafka.producer.value-serializer"
 
   // HBase constants
-  val EventKeyField = "hbase.event-key-field" // TODO: shared with model classes
+  val EventKeyField = "hbase.event-key-field" // TODO: shared with model classes, abstract out
   val ColumnFamily = "hbase.column-family"
-  val AllTruckGeoSpeedEvents = "hbase.all-truck-geospeed.table"
-  val AnomalousTruckGeoSpeedEvents = "hbase.anomalous-truck-geospeed.table"
-  val AnomalousTruckGeoSpeedEventsCount = "hbase.anomalous-truck-geospeed-count.table"
+  val AllTruckGeoSpeedEvents = "hbase.all-geospeed.table"
+  val AnomalousTruckGeoSpeedEvents = "hbase.anomalous-geospeed.table"
+  val AnomalousTruckGeoSpeedEventsCount = "hbase.anomalous-geospeed-count.table"
 
 
   def main(args: Array[String]): Unit = {
 
     // Extract specified configuration file path from supplied argument, else throw Exception
-    val configName = if (args.nonEmpty) args(0) else throw new IllegalArgumentException("Must specify path to configuration file.")
+    val configName = if (args.nonEmpty) args(0) else throw new IllegalArgumentException("Must specify name of configuration file.")
     val config = ConfigFactory.load(configName)
 
     // Set up configuration for the Storm Topology
@@ -60,18 +61,12 @@ object TruckingTopology {
     stormConfig.setDebug(config.getBoolean(Config.TOPOLOGY_DEBUG))
     stormConfig.setMessageTimeoutSecs(config.getInt(Config.TOPOLOGY_MESSAGE_TIMEOUT_SECS))
     stormConfig.setNumWorkers(config.getInt(Config.TOPOLOGY_WORKERS))
-    //val emptyConfig = Map.empty[String, String]
-    val emptyConfig = scala.collection.immutable.HashMap[String, String](("A", "B")).map(identity)
-    stormConfig.put("emptyConfig", emptyConfig) // Because current version of storm is the way it is -_-
+
+    // TODO: would be nice if storm.Config had "setProperty" to hide hashmap implementation
+    stormConfig.put("emptyConfig", new java.util.HashMap[String, String]) // Because current version of storm is the way it is -_-
 
     // Build out a TruckTopology
     val topology = new TruckingTopology(config).buildTopology()
-
-    // TODO: diff between this and cluster modes
-    // TODO: for reference: https://docs.hortonworks.com/HDPDocuments/HDP2/HDP-2.5.0/bk_storm-component-guide/content/storm-kafkaspout-config-core.html
-    // TODO: good info: http://kafka.apache.org/documentation.html#newconsumerconfigs
-    // TODO: read https://github.com/apache/storm/tree/master/external/storm-kafka
-    // TODO: https://cwiki.apache.org/confluence/display/KAFKA/FAQ
 
     // Submit the topology to run on the cluster
     StormSubmitter.submitTopology("truckTopology", stormConfig, topology)
@@ -95,13 +90,15 @@ object TruckingTopology {
   */
 class TruckingTopology(config: TypeConfig) {
 
+  lazy val logger = Logger(classOf[TruckingTopology])
+
   /**
     *
     * @return a built StormTopology
     */
   def buildTopology(): StormTopology = {
     // Builder to perform the construction of the topology.
-    val builder = new TopologyBuilder()
+    implicit val builder = new TopologyBuilder()
 
     // Build Kafka Spouts to ingest truck geo/speed events
     buildTruckGeoSpout()
@@ -117,6 +114,8 @@ class TruckingTopology(config: TypeConfig) {
 
     // Build KafkaStore Bolt for pushing values to a messaging hub
     buildTruckGeoSpeedKafkaBolt()
+
+    logger.info("Storm topology finished building.")
 
     // Finally, create the topology
     builder.createTopology()
@@ -183,6 +182,7 @@ class TruckingTopology(config: TypeConfig) {
       .withColumnFamily(config.getString(TruckingTopology.ColumnFamily))
 
     // Create a bolt, with its configurations stored under the configuration keyed "emptyConfig"
+    // Default configs here: https://github.com/apache/hbase/blob/master/hbase-common/src/main/resources/hbase-default.xml
     val bolt = new HBaseBolt(config.getString(TruckingTopology.AllTruckGeoSpeedEvents), mapper)
       .withConfigKey("emptyConfig")
 

@@ -3,6 +3,7 @@ package com.hortonworks.orendainx.trucking.topology.schemes
 import java.nio.ByteBuffer
 import java.sql.Timestamp
 
+import com.typesafe.scalalogging.Logger
 import org.apache.storm.tuple.{Fields, Values}
 
 /**
@@ -12,8 +13,12 @@ import org.apache.storm.tuple.{Fields, Values}
   */
 object TruckSpeedScheme extends DelimitedScheme("\\|") {
 
-  // TODO: dont wrap, just feed in as strings
+  lazy val logger = Logger(this.getClass)
+
   override def deserialize(buffer: ByteBuffer): Values = {
+
+    logger.info("Deserializing string")
+
     val strings = deserializeString(buffer)
 
     // Extract data from buffer
