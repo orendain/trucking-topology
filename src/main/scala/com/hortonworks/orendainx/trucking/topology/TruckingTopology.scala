@@ -2,8 +2,9 @@ package com.hortonworks.orendainx.trucking.topology
 
 import java.util.Properties
 
-import com.hortonworks.orendainx.trucking.topology.bolts.TruckGeoSpeedJoinBolt
-import com.hortonworks.orendainx.trucking.topology.schemes.{TruckGeoScheme, TruckSpeedScheme}
+import com.hortonworks.orendainx.trucking.shared.schemes.TruckingEventScheme
+import com.hortonworks.orendainx.trucking.topology.bolts.RouterBolt
+import com.hortonworks.orendainx.trucking.topology.schemes.TruckingEventScheme
 import com.typesafe.config.{ConfigFactory, Config => TypeConfig}
 import com.typesafe.scalalogging.Logger
 import org.apache.storm.generated.StormTopology
@@ -35,7 +36,7 @@ object TruckingTopology {
   // Kafka topic constants
   val TruckGeoTopic = "kafka.consumer.truck-geo.topic"
   val TruckSpeedTopic = "kafka.consumer.truck-geo.topic"
-  val TruckGeoSpeedTopic = "kafka.consumer.truck-geospeed.topic"
+  val TruckingTopic = "kafka.consumer.trucking.topic"
 
   // Kafka producer configuration constants
   val KafkaBootstrapServers = "kafka.producer.bootstrap-servers"
@@ -45,9 +46,9 @@ object TruckingTopology {
   // HBase constants
   val EventKeyField = "hbase.event-key-field" // TODO: shared with model classes, abstract out
   val ColumnFamily = "hbase.column-family"
-  val AllTruckGeoSpeedEvents = "hbase.all-geospeed.table"
-  val AnomalousTruckGeoSpeedEvents = "hbase.anomalous-geospeed.table"
-  val AnomalousTruckGeoSpeedEventsCount = "hbase.anomalous-geospeed-count.table"
+  val AllTruckingEvents = "hbase.all-trucking.table"
+  val AnomalousTruckingEvents = "hbase.anomalous-trucking.table"
+  val AnomalousTruckingEventsCount = "hbase.anomalous-trucking-count.table"
 
 
   def main(args: Array[String]): Unit = {
@@ -100,20 +101,19 @@ class TruckingTopology(config: TypeConfig) {
     // Builder to perform the construction of the topology.
     implicit val builder = new TopologyBuilder()
 
-    // Build Kafka Spouts to ingest truck geo/speed events
-    buildTruckGeoSpout()
-    buildTruckSpeedSpout()
+    // Build Kafka Spouts to ingest trucking events
+    buildKafkaSpout()
 
-    // Built Bolt to Join geo and speed events
-    buildStreamJoinBolt()
+    // Built Bolt to route data to multiple streams
+    buildRouterBolt()
 
     // Build HBase Bolts to persist all events, as well as specific anomalies
-    buildAllTruckGeoSpeedEventsHBaseBolt()
-    buildAnomalousTruckGeoSpeedEventsHBaseBolt()
-    buildAnomalousTruckGeoSpeedEventsCountHBaseBolt()
+    buildAllTruckingEventsHBaseBolt()
+    buildAnomalousTruckingEventsHBaseBolt()
+    buildAnomalousTruckingEventsCountHBaseBolt()
 
     // Build KafkaStore Bolt for pushing values to a messaging hub
-    buildTruckGeoSpeedKafkaBolt()
+    buildKafkaBolt()
 
     logger.info("Storm topology finished building.")
 
@@ -121,7 +121,7 @@ class TruckingTopology(config: TypeConfig) {
     builder.createTopology()
   }
 
-  def buildTruckGeoSpout()(implicit builder: TopologyBuilder): Unit = {
+  def buildKafkaSpout()(implicit builder: TopologyBuilder): Unit = {
     // Extract values from config
     val hosts = new ZkHosts(config.getString(Config.STORM_ZOOKEEPER_SERVERS))
     val zkRoot = config.getString(Config.STORM_ZOOKEEPER_ROOT)
@@ -131,47 +131,28 @@ class TruckingTopology(config: TypeConfig) {
 
     // Create a Spout configuration object and apply the scheme for the data that will come through this spout
     val spoutConfig = new SpoutConfig(hosts, topic, zkRoot, groupId)
-    spoutConfig.scheme = new SchemeAsMultiScheme(TruckGeoScheme)
+    spoutConfig.scheme = new SchemeAsMultiScheme(TruckingEventScheme)
 
     // Create a spout with the specified configuration, and place it in the topology blueprint
     val kafkaSpout = new KafkaSpout(spoutConfig)
-    builder.setSpout("truckGeoEvents", kafkaSpout, taskCount)
+    builder.setSpout("truckingEvents", kafkaSpout, taskCount)
   }
 
-  def buildTruckSpeedSpout()(implicit builder: TopologyBuilder): Unit = {
-    // Extract values from config
-    val hosts = new ZkHosts(config.getString(Config.STORM_ZOOKEEPER_SERVERS))
-    val zkRoot = config.getString(Config.STORM_ZOOKEEPER_ROOT)
-    val taskCount = config.getInt(Config.TOPOLOGY_TASKS)
-    val topic = config.getString(TruckingTopology.TruckSpeedTopic)
-    val groupId = config.getString(TruckingTopology.ConsumerGroupId)
-
-    // Create a Spout configuration object and apply the scheme for the data that will come through this spout
-    val spoutConfig = new SpoutConfig(hosts, topic, zkRoot, groupId)
-    spoutConfig.scheme = new SchemeAsMultiScheme(TruckSpeedScheme)
-    spoutConfig.ignoreZkOffsets = true // Force the spout to ignore where it left off during previous runs
-
-    // Create a spout with the specified configuration, and place it in the topology blueprint
-    val kafkaSpout = new KafkaSpout(spoutConfig)
-    builder.setSpout("truckSpeedEvents", kafkaSpout, taskCount)
-  }
-
-  def buildStreamJoinBolt()(implicit builder: TopologyBuilder): Unit = {
+  def buildRouterBolt()(implicit builder: TopologyBuilder): Unit = {
     // Extract values from config
     val taskCount = config.getInt(Config.TOPOLOGY_TASKS)
     val duration = config.getInt(Config.TOPOLOGY_BOLTS_WINDOW_LENGTH_DURATION_MS)
 
     // Create a bolt with a tumbling window
     val windowDuration = new BaseWindowedBolt.Duration(duration, MILLISECONDS)
-    val bolt = new TruckGeoSpeedJoinBolt().withTumblingWindow(windowDuration)
+    val bolt = new RouterBolt().withTumblingWindow(windowDuration)
 
     // Place the bolt in the topology blueprint
     builder.setBolt("joinTruckEvents", bolt, taskCount)
-      .fieldsGrouping("truckGeoEvents", new Fields("driverId")) // TODO: cleanup/remove Fields
-      .fieldsGrouping("truckSpeedEvents", new Fields("driverId"))
+      .fieldsGrouping("truckingEvents", new Fields("driverId")) // TODO: cleanup/remove Field
   }
 
-  def buildAllTruckGeoSpeedEventsHBaseBolt()(implicit builder: TopologyBuilder): Unit = {
+  def buildAllTruckingEventsHBaseBolt()(implicit builder: TopologyBuilder): Unit = {
     // Extract values from config
     val taskCount = config.getInt(Config.TOPOLOGY_TASKS)
 
@@ -183,15 +164,15 @@ class TruckingTopology(config: TypeConfig) {
 
     // Create a bolt, with its configurations stored under the configuration keyed "emptyConfig"
     // Default configs here: https://github.com/apache/hbase/blob/master/hbase-common/src/main/resources/hbase-default.xml
-    val bolt = new HBaseBolt(config.getString(TruckingTopology.AllTruckGeoSpeedEvents), mapper)
+    val bolt = new HBaseBolt(config.getString(TruckingTopology.AllTruckingEvents), mapper)
       .withConfigKey("emptyConfig")
 
     // Place the bolt in the topology builder
-    builder.setBolt("persistAllTruckGeoSpeedEvents", bolt, taskCount).shuffleGrouping("joinTruckEvents")
+    builder.setBolt("persistAllTruckingEvents", bolt, taskCount).shuffleGrouping("joinTruckEvents")
       //.fieldsGrouping("joinTruckEvents", getAllFields()) // TODO: what?
   }
 
-  def buildAnomalousTruckGeoSpeedEventsHBaseBolt()(implicit builder: TopologyBuilder): Unit = {
+  def buildAnomalousTruckingEventsHBaseBolt()(implicit builder: TopologyBuilder): Unit = {
     // Extract values from config
     val taskCount = config.getInt(Config.TOPOLOGY_TASKS)
 
@@ -202,15 +183,15 @@ class TruckingTopology(config: TypeConfig) {
       .withColumnFamily(config.getString(TruckingTopology.ColumnFamily))
 
     // Create a bolt, with its configurations stored under the configuration keyed "emptyConfig"
-    val bolt = new HBaseBolt(config.getString(TruckingTopology.AnomalousTruckGeoSpeedEvents), mapper)
+    val bolt = new HBaseBolt(config.getString(TruckingTopology.AnomalousTruckingEvents), mapper)
       .withConfigKey("emptyConfig")
 
     // Place the bolt in the topology builder
-    builder.setBolt("persistAnomalousTruckGeoSpeedEvents", bolt, taskCount)
+    builder.setBolt("persistAnomalousTruckingEvents", bolt, taskCount)
       .shuffleGrouping("joinTruckEvents", "anomalousEvents")
   }
 
-  def buildAnomalousTruckGeoSpeedEventsCountHBaseBolt()(implicit builder: TopologyBuilder): Unit = {
+  def buildAnomalousTruckingEventsCountHBaseBolt()(implicit builder: TopologyBuilder): Unit = {
     // Extract values from config
     val taskCount = config.getInt(Config.TOPOLOGY_TASKS)
 
@@ -222,15 +203,15 @@ class TruckingTopology(config: TypeConfig) {
       .withColumnFamily(config.getString(TruckingTopology.ColumnFamily))
 
     // Create a bolt, with its configurations stored under the configuration keyed "emptyConfig"
-    val bolt = new HBaseBolt(config.getString(TruckingTopology.AnomalousTruckGeoSpeedEventsCount), mapper)
+    val bolt = new HBaseBolt(config.getString(TruckingTopology.AnomalousTruckingEventsCount), mapper)
       .withConfigKey("emptyConfig")
 
     // Place the bolt in the topology builder
-    builder.setBolt("persistAnomalousTruckGeoSpeedEventsCount", bolt, taskCount)
+    builder.setBolt("persistAnomalousTruckingEventsCount", bolt, taskCount)
       .shuffleGrouping("joinTruckEvents", "anomalousEvents")  // TODO: for now, this looks exactly like anomalousTable ... implement counting
   }
 
-  def buildTruckGeoSpeedKafkaBolt()(implicit builder: TopologyBuilder): Unit = {
+  def buildKafkaBolt()(implicit builder: TopologyBuilder): Unit = {
     // Extract values from config
     val taskCount = config.getInt(Config.TOPOLOGY_TASKS)
     val bootstrapServers = config.getString(TruckingTopology.KafkaBootstrapServers)
@@ -244,11 +225,11 @@ class TruckingTopology(config: TypeConfig) {
     props.setProperty("value.serializer", valueSerializer)
 
     val bolt = new KafkaBolt()
-      .withTopicSelector(new DefaultTopicSelector(config.getString(TruckingTopology.TruckGeoSpeedTopic)))
+      .withTopicSelector(new DefaultTopicSelector(config.getString(TruckingTopology.TruckingTopic)))
       .withTupleToKafkaMapper(new FieldNameBasedTupleToKafkaMapper()) // TODO: when first imported, inteillj added "[]" for types to fill in
       .withProducerProperties(props)
 
-    builder.setBolt("pushOutTruckGeoSpeedEvents", bolt, taskCount)
+    builder.setBolt("pushOutTruckingEvents", bolt, taskCount)
       .shuffleGrouping("joinTruckEvents")
   }
 }
