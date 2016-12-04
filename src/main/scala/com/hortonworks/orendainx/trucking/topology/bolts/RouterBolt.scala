@@ -2,20 +2,18 @@ package com.hortonworks.orendainx.trucking.topology.bolts
 
 import java.util
 
-import com.hortonworks.orendainx.trucking.topology.models.{TruckGeoEvent, TruckGeoSpeedEvent, TruckSpeedEvent}
-import com.hortonworks.orendainx.shared.models.TruckingEvent
-import com.hortonworks.orendainx.trucking.topology.schemes.TruckingEventScheme
+import com.hortonworks.orendainx.trucking.shared.models.TruckingEvent
+import com.hortonworks.orendainx.trucking.shared.schemes.TruckingEventScheme
 import com.typesafe.scalalogging.Logger
 import org.apache.storm.task.{OutputCollector, TopologyContext}
 import org.apache.storm.topology.OutputFieldsDeclarer
 import org.apache.storm.topology.base.BaseWindowedBolt
-import org.apache.storm.tuple.Fields
 import org.apache.storm.windowing.TupleWindow
 
 import scala.collection.JavaConversions._
 
 /**
-  * Bolt responsible for joining geo and speed events into a single set of fields.
+  * Bolt responsible for routing data to multiple streams.
   *
   * @author Edgar Orendain <edgar@orendainx.com>
   */
@@ -39,7 +37,6 @@ class RouterBolt() extends BaseWindowedBolt {
   }
 
   override def execute(inputWindow: TupleWindow): Unit = {
-
     logger.info("Executing")
 
     // Extract all of the tuples from the TupleWindow and parse them into proper event classes

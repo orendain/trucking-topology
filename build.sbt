@@ -1,4 +1,4 @@
-name := "truckingTopology"
+name := "trucking-topology"
 
 version := "0.1"
 
@@ -7,6 +7,8 @@ organization := "com.hortonworks.orendainx"
 scalaVersion := "2.11.8"
 
 libraryDependencies ++= Seq(
+
+  "com.hortonworks.orendainx" %% "trucking-shared" % "0.1",
 
   // HDP will provide it's own Storm Jar, so we mark it as "provided"
   "org.apache.storm" % "storm-core" % "1.0.2" % "provided",
@@ -48,10 +50,6 @@ libraryDependencies ++= Seq(
   "com.typesafe" % "config" % "1.3.1",
   "com.github.pathikrit" %% "better-files" % "2.16.0"
 )
-
-// TODO: Better way to resolve this specific conflict.
-fork := true
-scalacOptions += "-Yresolve-term-conflict:package"
 
 // Export Jars, not class files
 exportJars := true

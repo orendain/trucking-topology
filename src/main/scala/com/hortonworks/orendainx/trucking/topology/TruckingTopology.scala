@@ -4,7 +4,6 @@ import java.util.Properties
 
 import com.hortonworks.orendainx.trucking.shared.schemes.TruckingEventScheme
 import com.hortonworks.orendainx.trucking.topology.bolts.RouterBolt
-import com.hortonworks.orendainx.trucking.topology.schemes.TruckingEventScheme
 import com.typesafe.config.{ConfigFactory, Config => TypeConfig}
 import com.typesafe.scalalogging.Logger
 import org.apache.storm.generated.StormTopology
