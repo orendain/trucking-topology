@@ -10,6 +10,8 @@ libraryDependencies ++= Seq(
 
   "com.hortonworks.orendainx" %% "trucking-shared" % "0.1",
 
+  "org.apache.nifi" % "nifi-storm-spout" % "1.1.0",
+
   // HDP will provide it's own Storm Jar, so we mark it as "provided"
   "org.apache.storm" % "storm-core" % "1.0.2" % "provided",
   ("org.apache.storm" % "storm-kafka" % "1.0.2")
@@ -53,3 +55,5 @@ libraryDependencies ++= Seq(
 
 // Export Jars, not class files
 exportJars := true
+
+scalacOptions ++= Seq("-feature")

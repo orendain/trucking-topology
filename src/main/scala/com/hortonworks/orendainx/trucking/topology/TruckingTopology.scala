@@ -6,6 +6,8 @@ import com.hortonworks.orendainx.trucking.shared.schemes.TruckingEventScheme
 import com.hortonworks.orendainx.trucking.topology.bolts.RouterBolt
 import com.typesafe.config.{ConfigFactory, Config => TypeConfig}
 import com.typesafe.scalalogging.Logger
+import org.apache.nifi.remote.client.{SiteToSiteClient, SiteToSiteClientConfig}
+import org.apache.nifi.storm.{NiFiBolt, NiFiDataPacketBuilder, NiFiSpout}
 import org.apache.storm.generated.StormTopology
 import org.apache.storm.hbase.bolt.HBaseBolt
 import org.apache.storm.hbase.bolt.mapper.SimpleHBaseMapper
@@ -29,25 +31,13 @@ import scala.concurrent.duration._
   */
 object TruckingTopology {
 
-  // Kafka consumer group id
-  val ConsumerGroupId = "kafka.consumer.group.id"
-
-  // Kafka topic constants
-  val TruckGeoTopic = "kafka.consumer.truck-geo.topic"
-  val TruckSpeedTopic = "kafka.consumer.truck-geo.topic"
-  val TruckingTopic = "kafka.consumer.trucking.topic"
-
-  // Kafka producer configuration constants
-  val KafkaBootstrapServers = "kafka.producer.bootstrap-servers"
-  val KafkaKeySerializer = "kafka.producer.key-serializer"
-  val KafkaValueSerializer = "kafka.producer.value-serializer"
-
-  // HBase constants
-  val EventKeyField = "hbase.event-key-field" // TODO: shared with model classes, abstract out
-  val ColumnFamily = "hbase.column-family"
-  val AllTruckingEvents = "hbase.all-trucking.table"
-  val AnomalousTruckingEvents = "hbase.anomalous-trucking.table"
-  val AnomalousTruckingEventsCount = "hbase.anomalous-trucking-count.table"
+  // NiFi constants
+  val NiFiUrl = "nifi.url"
+  val NiFiInputPortName = "nifi.input.port-name"
+  val NiFiInputBatchSize = "nifi.input.batch-size"
+  val NiFiOutputPortName = "nifi.output.port-name"
+  val NiFiOutputBatchSize = "nifi.output.batch-size"
+  val NiFiOutputTickFrequency = "nifi.output.tick-frequency"
 
 
   def main(args: Array[String]): Unit = {
@@ -100,19 +90,14 @@ class TruckingTopology(config: TypeConfig) {
     // Builder to perform the construction of the topology.
     implicit val builder = new TopologyBuilder()
 
-    // Build Kafka Spouts to ingest trucking events
-    buildKafkaSpout()
+    // Build Nifi Spout to ingest trucking events
+    buildNifiSpout()
 
     // Built Bolt to route data to multiple streams
     buildRouterBolt()
 
-    // Build HBase Bolts to persist all events, as well as specific anomalies
-    buildAllTruckingEventsHBaseBolt()
-    buildAnomalousTruckingEventsHBaseBolt()
-    buildAnomalousTruckingEventsCountHBaseBolt()
-
-    // Build KafkaStore Bolt for pushing values to a messaging hub
-    buildKafkaBolt()
+    // Build Nifi Bolt for pushing values back to Nifi
+    buildNifiBolt()
 
     logger.info("Storm topology finished building.")
 
@@ -120,21 +105,24 @@ class TruckingTopology(config: TypeConfig) {
     builder.createTopology()
   }
 
-  def buildKafkaSpout()(implicit builder: TopologyBuilder): Unit = {
+  def buildNifiSpout()(implicit builder: TopologyBuilder): Unit = {
     // Extract values from config
-    val hosts = new ZkHosts(config.getString(Config.STORM_ZOOKEEPER_SERVERS))
-    val zkRoot = config.getString(Config.STORM_ZOOKEEPER_ROOT)
+    val nifiUrl = config.getString(TruckingTopology.NiFiUrl)
+    val nifiPortName = config.getString(TruckingTopology.NiFiOutputPortName)
+    //val batchSize = config.getString(TruckingTopology.NiFiOutputBatchSize)
     val taskCount = config.getInt(Config.TOPOLOGY_TASKS)
-    val topic = config.getString(TruckingTopology.TruckGeoTopic)
-    val groupId = config.getString(TruckingTopology.ConsumerGroupId)
 
-    // Create a Spout configuration object and apply the scheme for the data that will come through this spout
-    val spoutConfig = new SpoutConfig(hosts, topic, zkRoot, groupId)
-    spoutConfig.scheme = new SchemeAsMultiScheme(TruckingEventScheme)
+    // This example assumes that NiFi exposes an OutputPort on the root group named "Data For Storm".
+    // Additionally, it assumes that the data that it will receive from this OutputPort is text data, as it will map the byte array received from NiFi to a UTF-8 Encoded string.
+    val client = new SiteToSiteClient.Builder()
+      .url(nifiUrl)
+      .portName(nifiPortName)
+      //.requestBatchCount(batchSize)
+      .buildConfig()
 
     // Create a spout with the specified configuration, and place it in the topology blueprint
-    val kafkaSpout = new KafkaSpout(spoutConfig)
-    builder.setSpout("truckingEvents", kafkaSpout, taskCount)
+    val nifiSpout = new NiFiSpout(client)
+    builder.setSpout("truckingEvents", nifiSpout, taskCount)
   }
 
   def buildRouterBolt()(implicit builder: TopologyBuilder): Unit = {
@@ -151,84 +139,24 @@ class TruckingTopology(config: TypeConfig) {
       .fieldsGrouping("truckingEvents", new Fields("driverId")) // TODO: cleanup/remove Field
   }
 
-  def buildAllTruckingEventsHBaseBolt()(implicit builder: TopologyBuilder): Unit = {
+  def buildNifiBolt()(implicit builder: TopologyBuilder): Unit = {
     // Extract values from config
+    val nifiUrl = config.getString(TruckingTopology.NiFiUrl)
+    val nifiPortName = config.getString(TruckingTopology.NiFiOutputPortName)
+    val tickFrequency = config.getInt(TruckingTopology.NiFiOutputTickFrequency)
+    val batchSize = config.getInt(TruckingTopology.NiFiOutputBatchSize)
     val taskCount = config.getInt(Config.TOPOLOGY_TASKS)
 
-    // Create an HBaseMapper that maps Storm tuples to HBase columns
-    val mapper = new SimpleHBaseMapper()
-      .withRowKeyField(config.getString(TruckingTopology.EventKeyField))
-      .withColumnFields(new Fields()) // TODO: implement
-      .withColumnFamily(config.getString(TruckingTopology.ColumnFamily))
+    val client = new SiteToSiteClient.Builder()
+      .url(nifiUrl)
+      .portName(nifiPortName)
+      .buildConfig()
 
-    // Create a bolt, with its configurations stored under the configuration keyed "emptyConfig"
-    // Default configs here: https://github.com/apache/hbase/blob/master/hbase-common/src/main/resources/hbase-default.xml
-    val bolt = new HBaseBolt(config.getString(TruckingTopology.AllTruckingEvents), mapper)
-      .withConfigKey("emptyConfig")
+    val packetBuilder = new TruckingDataBuilder()
+    val nifiBolt = new NiFiBolt(client, packetBuilder, tickFrequency)
+      .withBatchSize(batchSize)
 
-    // Place the bolt in the topology builder
-    builder.setBolt("persistAllTruckingEvents", bolt, taskCount).shuffleGrouping("joinTruckEvents")
-      //.fieldsGrouping("joinTruckEvents", getAllFields()) // TODO: what?
-  }
-
-  def buildAnomalousTruckingEventsHBaseBolt()(implicit builder: TopologyBuilder): Unit = {
-    // Extract values from config
-    val taskCount = config.getInt(Config.TOPOLOGY_TASKS)
-
-    // Create an HBaseMapper that maps Storm tuples to HBase columns
-    val mapper = new SimpleHBaseMapper()
-      .withRowKeyField(TruckingTopology.EventKeyField)
-      .withColumnFields(new Fields()) // TODO: implement
-      .withColumnFamily(config.getString(TruckingTopology.ColumnFamily))
-
-    // Create a bolt, with its configurations stored under the configuration keyed "emptyConfig"
-    val bolt = new HBaseBolt(config.getString(TruckingTopology.AnomalousTruckingEvents), mapper)
-      .withConfigKey("emptyConfig")
-
-    // Place the bolt in the topology builder
-    builder.setBolt("persistAnomalousTruckingEvents", bolt, taskCount)
-      .shuffleGrouping("joinTruckEvents", "anomalousEvents")
-  }
-
-  def buildAnomalousTruckingEventsCountHBaseBolt()(implicit builder: TopologyBuilder): Unit = {
-    // Extract values from config
-    val taskCount = config.getInt(Config.TOPOLOGY_TASKS)
-
-    // Create an HBaseMapper that maps Storm tuples to HBase columns
-    val mapper = new SimpleHBaseMapper()
-      .withRowKeyField(TruckingTopology.EventKeyField)
-      .withColumnFields(new Fields()) // TODO: implement
-      //.withCounterFields(new Fields("")) // TODO: implement
-      .withColumnFamily(config.getString(TruckingTopology.ColumnFamily))
-
-    // Create a bolt, with its configurations stored under the configuration keyed "emptyConfig"
-    val bolt = new HBaseBolt(config.getString(TruckingTopology.AnomalousTruckingEventsCount), mapper)
-      .withConfigKey("emptyConfig")
-
-    // Place the bolt in the topology builder
-    builder.setBolt("persistAnomalousTruckingEventsCount", bolt, taskCount)
-      .shuffleGrouping("joinTruckEvents", "anomalousEvents")  // TODO: for now, this looks exactly like anomalousTable ... implement counting
-  }
-
-  def buildKafkaBolt()(implicit builder: TopologyBuilder): Unit = {
-    // Extract values from config
-    val taskCount = config.getInt(Config.TOPOLOGY_TASKS)
-    val bootstrapServers = config.getString(TruckingTopology.KafkaBootstrapServers)
-    val keySerializer = config.getString(TruckingTopology.KafkaKeySerializer)
-    val valueSerializer = config.getString(TruckingTopology.KafkaValueSerializer)
-
-    // Define properties to pass along to the KafkaBolt
-    val props = new Properties()
-    props.setProperty("bootstrap.servers", bootstrapServers)
-    props.setProperty("key.serializer", keySerializer)
-    props.setProperty("value.serializer", valueSerializer)
-
-    val bolt = new KafkaBolt()
-      .withTopicSelector(new DefaultTopicSelector(config.getString(TruckingTopology.TruckingTopic)))
-      .withTupleToKafkaMapper(new FieldNameBasedTupleToKafkaMapper()) // TODO: when first imported, inteillj added "[]" for types to fill in
-      .withProducerProperties(props)
-
-    builder.setBolt("pushOutTruckingEvents", bolt, taskCount)
+    builder.setBolt("pushOutTruckingEvents", nifiBolt, taskCount)
       .shuffleGrouping("joinTruckEvents")
   }
 }
