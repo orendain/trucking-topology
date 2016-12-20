@@ -10,7 +10,9 @@ import org.apache.storm.tuple.Tuple
 /**
   * @author Edgar Orendain <edgar@orendainx.com>
   */
-class TruckingDataBuilder extends NiFiDataPacketBuilder {
+
+//Exception in thread "main" java.lang.IllegalStateException: Bolt 'pushOutTruckingEvents' contains a non-serializable field of type com.hortonworks.orendainx.trucking.topology.TruckingDataBuilder, which was instantiated prior to topology creation. com.hortonworks.orendainx.trucking.topology.TruckingDataBuilder should be instantiated within the prepare method of 'pushOutTruckingEvents at the earliest.
+class TruckingDataBuilder extends NiFiDataPacketBuilder with Serializable {
 
   lazy val logger = Logger(this.getClass)
 
