@@ -9,6 +9,7 @@ import org.apache.nifi.storm.NiFiDataPacket
 import org.apache.storm.task.{OutputCollector, TopologyContext}
 import org.apache.storm.topology.OutputFieldsDeclarer
 import org.apache.storm.topology.base.BaseWindowedBolt
+import org.apache.storm.tuple.{Fields, Values}
 import org.apache.storm.windowing.TupleWindow
 
 import scala.collection.JavaConversions._
@@ -40,6 +41,7 @@ class RouterBolt() extends BaseWindowedBolt {
       val dp = tuple.getValueByField("nifiDataPacket").asInstanceOf[NiFiDataPacket]
       logger.info(s"Attributs: ${dp.getAttributes}")
       logger.info(s"Content: ${dp.getContent.toString}")
+      outputCollector.emit(new Values(dp.getContent.toString))
     }
 
     // Emit data downstream, but give special consideration to anomalous events
@@ -52,6 +54,7 @@ class RouterBolt() extends BaseWindowedBolt {
 
   override def declareOutputFields(declarer: OutputFieldsDeclarer): Unit = {
     // Declare a stream with the default id and one with a custom id
+    declarer.declare(new Fields("someField"))
     //declarer.declare(TruckingEventScheme.getOutputFields)
     //declarer.declareStream("anomalousEvents", TruckingEventScheme.getOutputFields)
   }
