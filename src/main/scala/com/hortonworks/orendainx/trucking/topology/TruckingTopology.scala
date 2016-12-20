@@ -136,7 +136,7 @@ class TruckingTopology(config: TypeConfig) {
 
     // Place the bolt in the topology blueprint
     builder.setBolt("joinTruckEvents", bolt, taskCount)
-      //.fieldsGrouping("truckingEvents", new Fields("driverId"))
+      .shuffleGrouping("truckingEvents")
   }
 
   def buildNifiBolt()(implicit builder: TopologyBuilder): Unit = {
