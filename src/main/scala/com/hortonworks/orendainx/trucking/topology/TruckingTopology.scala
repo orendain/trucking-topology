@@ -110,7 +110,7 @@ class TruckingTopology(config: TypeConfig) {
     // Extract values from config
     val nifiUrl = config.getString(TruckingTopology.NiFiUrl)
     val nifiPortName = config.getString(TruckingTopology.NiFiInputPortName)
-    //val batchSize = config.getString(TruckingTopology.NiFiOutputBatchSize)
+    //val batchSize = config.getString(TruckingTopology.NiFiInputBatchSize)
     val taskCount = config.getInt(Config.TOPOLOGY_TASKS)
 
     // This example assumes that NiFi exposes an OutputPort on the root group named "Data For Storm".
