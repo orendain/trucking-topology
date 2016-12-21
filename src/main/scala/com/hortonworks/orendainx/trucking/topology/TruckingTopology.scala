@@ -35,6 +35,7 @@ object TruckingTopology {
   val NiFiUrl = "nifi.url"
   val NiFiInputPortName = "nifi.input.port-name"
   val NiFiInputBatchSize = "nifi.input.batch-size"
+
   val NiFiOutputPortName = "nifi.output.port-name"
   val NiFiOutputBatchSize = "nifi.output.batch-size"
   val NiFiOutputTickFrequency = "nifi.output.tick-frequency"
@@ -108,7 +109,7 @@ class TruckingTopology(config: TypeConfig) {
   def buildNifiSpout()(implicit builder: TopologyBuilder): Unit = {
     // Extract values from config
     val nifiUrl = config.getString(TruckingTopology.NiFiUrl)
-    val nifiPortName = config.getString(TruckingTopology.NiFiOutputPortName)
+    val nifiPortName = config.getString(TruckingTopology.NiFiInputPortName)
     //val batchSize = config.getString(TruckingTopology.NiFiOutputBatchSize)
     val taskCount = config.getInt(Config.TOPOLOGY_TASKS)
 
