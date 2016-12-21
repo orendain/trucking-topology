@@ -152,7 +152,7 @@ class TruckingTopology(config: TypeConfig) {
       .portName(nifiPortName)
       .buildConfig()
 
-    val packetBuilder = new TruckingDataBuilder()
+    val packetBuilder = new TruckingPacketBuilder()
     val nifiBolt = new NiFiBolt(client, packetBuilder, tickFrequency)
       //.withBatchSize(batchSize)
 

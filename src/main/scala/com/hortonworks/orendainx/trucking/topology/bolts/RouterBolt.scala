@@ -1,5 +1,6 @@
 package com.hortonworks.orendainx.trucking.topology.bolts
 
+import java.nio.charset.StandardCharsets
 import java.util
 
 import com.hortonworks.orendainx.trucking.shared.models.TruckingEvent
@@ -40,9 +41,17 @@ class RouterBolt() extends BaseWindowedBolt {
       logger.info(s"Raw: ${tuple.toString}")
       val dp = tuple.getValueByField("nifiDataPacket").asInstanceOf[NiFiDataPacket]
       logger.info(s"Attributs: ${dp.getAttributes}")
-      logger.info(s"Content: ${dp.getContent.toString}")
-      outputCollector.emit(new Values(dp.getContent.toString))
+      logger.info(s"Content: ${dp.getContent}")
+      val contentStr = new String(dp.getContent, StandardCharsets.UTF_8)
+      logger.info(s"Content2: $contentStr")
+      outputCollector.emit(new Values(contentStr))
     }
+
+    /*
+    2016-12-21 20:07:54.049 c.h.o.t.t.b.RouterBolt [INFO] Raw: source: truckingEvents:5, stream: default, id: {}, [org.apache.nifi.storm.StandardNiFiDataPacket@150e79e6]
+2016-12-21 20:07:54.049 c.h.o.t.t.b.RouterBolt [INFO] Attributs: {path=./, mime.type=text/plain, filename=data.0-21546.txt, telemetry_device_id=1, uuid=b4dc46a5-702c-4c0f-aba5-db58309c0bf5}
+2016-12-21 20:07:54.049 c.h.o.t.t.b.RouterBolt [INFO] Content: [B@2711f3ad
+     */
 
     // Emit data downstream, but give special consideration to anomalous events
 //    geoEvents.foreach { event =>
