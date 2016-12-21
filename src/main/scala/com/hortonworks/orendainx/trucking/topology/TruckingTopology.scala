@@ -33,13 +33,12 @@ object TruckingTopology {
 
   // NiFi constants
   val NiFiUrl = "nifi.url"
-  val NiFiInputPortName = "nifi.input.port-name"
-  val NiFiInputBatchSize = "nifi.input.batch-size"
-
   val NiFiOutputPortName = "nifi.output.port-name"
   val NiFiOutputBatchSize = "nifi.output.batch-size"
-  val NiFiOutputTickFrequency = "nifi.output.tick-frequency"
 
+  val NiFiInputPortName = "nifi.input.port-name"
+  val NiFiInputBatchSize = "nifi.input.batch-size"
+  val NiFiInputTickFrequency = "nifi.output.tick-frequency"
 
   def main(args: Array[String]): Unit = {
 
@@ -109,8 +108,8 @@ class TruckingTopology(config: TypeConfig) {
   def buildNifiSpout()(implicit builder: TopologyBuilder): Unit = {
     // Extract values from config
     val nifiUrl = config.getString(TruckingTopology.NiFiUrl)
-    val nifiPortName = config.getString(TruckingTopology.NiFiInputPortName)
-    //val batchSize = config.getString(TruckingTopology.NiFiInputBatchSize)
+    val nifiPortName = config.getString(TruckingTopology.NiFiOutputPortName)
+    //val batchSize = config.getString(TruckingTopology.NiFiOutputBatchSize)
     val taskCount = config.getInt(Config.TOPOLOGY_TASKS)
 
     // This example assumes that NiFi exposes an OutputPort on the root group named "Data For Storm".
@@ -143,9 +142,9 @@ class TruckingTopology(config: TypeConfig) {
   def buildNifiBolt()(implicit builder: TopologyBuilder): Unit = {
     // Extract values from config
     val nifiUrl = config.getString(TruckingTopology.NiFiUrl)
-    val nifiPortName = config.getString(TruckingTopology.NiFiOutputPortName)
-    val tickFrequency = config.getInt(TruckingTopology.NiFiOutputTickFrequency)
-    val batchSize = config.getInt(TruckingTopology.NiFiOutputBatchSize)
+    val nifiPortName = config.getString(TruckingTopology.NiFiInputPortName)
+    val tickFrequency = config.getInt(TruckingTopology.NiFiInputTickFrequency)
+    val batchSize = config.getInt(TruckingTopology.NiFiInputBatchSize)
     val taskCount = config.getInt(Config.TOPOLOGY_TASKS)
 
     val client = new SiteToSiteClient.Builder()
@@ -155,7 +154,7 @@ class TruckingTopology(config: TypeConfig) {
 
     val packetBuilder = new TruckingDataBuilder()
     val nifiBolt = new NiFiBolt(client, packetBuilder, tickFrequency)
-      .withBatchSize(batchSize)
+      //.withBatchSize(batchSize)
 
     builder.setBolt("pushOutTruckingEvents", nifiBolt, taskCount)
       .shuffleGrouping("joinTruckEvents")
