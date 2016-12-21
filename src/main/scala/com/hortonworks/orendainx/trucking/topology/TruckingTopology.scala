@@ -38,7 +38,7 @@ object TruckingTopology {
 
   val NiFiInputPortName = "nifi.input.port-name"
   val NiFiInputBatchSize = "nifi.input.batch-size"
-  val NiFiInputTickFrequency = "nifi.output.tick-frequency"
+  val NiFiInputTickFrequency = "nifi.input.tick-frequency"
 
   def main(args: Array[String]): Unit = {
 
