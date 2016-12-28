@@ -1,24 +1,13 @@
 package com.hortonworks.orendainx.trucking.topology
 
-import java.util.Properties
-
-import com.hortonworks.orendainx.trucking.shared.schemes.TruckingEventScheme
 import com.hortonworks.orendainx.trucking.topology.bolts.RouterBolt
 import com.typesafe.config.{ConfigFactory, Config => TypeConfig}
 import com.typesafe.scalalogging.Logger
-import org.apache.nifi.remote.client.{SiteToSiteClient, SiteToSiteClientConfig}
-import org.apache.nifi.storm.{NiFiBolt, NiFiDataPacketBuilder, NiFiSpout}
+import org.apache.nifi.remote.client.SiteToSiteClient
+import org.apache.nifi.storm.{NiFiBolt, NiFiSpout}
 import org.apache.storm.generated.StormTopology
-import org.apache.storm.hbase.bolt.HBaseBolt
-import org.apache.storm.hbase.bolt.mapper.SimpleHBaseMapper
-import org.apache.storm.kafka.bolt.KafkaBolt
-import org.apache.storm.kafka.bolt.mapper.FieldNameBasedTupleToKafkaMapper
-import org.apache.storm.kafka.bolt.selector.DefaultTopicSelector
-import org.apache.storm.kafka.{KafkaSpout, SpoutConfig, ZkHosts}
-import org.apache.storm.spout.SchemeAsMultiScheme
 import org.apache.storm.topology.TopologyBuilder
 import org.apache.storm.topology.base.BaseWindowedBolt
-import org.apache.storm.tuple.Fields
 import org.apache.storm.{Config, StormSubmitter}
 
 import scala.concurrent.duration._
@@ -53,7 +42,7 @@ object TruckingTopology {
     stormConfig.setNumWorkers(config.getInt(Config.TOPOLOGY_WORKERS))
 
     // TODO: would be nice if storm.Config had "setProperty" to hide hashmap implementation
-    stormConfig.put("emptyConfig", new java.util.HashMap[String, String]) // Because current version of storm is the way it is -_-
+    stormConfig.put("emptyConfig", new java.util.HashMap[String, String]) // Because storm -_-
 
     // Build out a TruckTopology
     val topology = new TruckingTopology(config).buildTopology()
@@ -67,14 +56,10 @@ object TruckingTopology {
   * Create a topology with the following components.
   *
   * Spouts:
-  *   - KafkaSpout (for geo events)
-  *   - KafkaSpout (for speed events)
+  *   - NiFiSpout (for injesting trucking events from NiFi)
   * Bolt:
-  *   - TruckGeoSpeedJoinBolt
-  *   - HBaseBolt (all events)
-  *   - HBaseBolt (anomalous events)
-  *   - HBaseBolt (anomalous event count)
-  *   - KafkaBolt (outbound)
+  *   - RouterBolt
+  *   - NiFiBolt (for sending back out to NiFi)
   *
   * @author Edgar Orendain <edgar@orendainx.com>
   */
@@ -109,15 +94,14 @@ class TruckingTopology(config: TypeConfig) {
     // Extract values from config
     val nifiUrl = config.getString(TruckingTopology.NiFiUrl)
     val nifiPortName = config.getString(TruckingTopology.NiFiOutputPortName)
-    //val batchSize = config.getString(TruckingTopology.NiFiOutputBatchSize)
+    val batchSize = config.getInt(TruckingTopology.NiFiOutputBatchSize)
     val taskCount = config.getInt(Config.TOPOLOGY_TASKS)
 
-    // This example assumes that NiFi exposes an OutputPort on the root group named "Data For Storm".
-    // Additionally, it assumes that the data that it will receive from this OutputPort is text data, as it will map the byte array received from NiFi to a UTF-8 Encoded string.
+    // This assumes that the data is text data, as it will map the byte array received from NiFi to a UTF-8 Encoded string.
     val client = new SiteToSiteClient.Builder()
       .url(nifiUrl)
       .portName(nifiPortName)
-      //.requestBatchCount(batchSize)
+      .requestBatchCount(batchSize)
       .buildConfig()
 
     // Create a spout with the specified configuration, and place it in the topology blueprint
@@ -154,9 +138,9 @@ class TruckingTopology(config: TypeConfig) {
 
     val packetBuilder = new TruckingPacketBuilder()
     val nifiBolt = new NiFiBolt(client, packetBuilder, tickFrequency)
-      //.withBatchSize(batchSize)
+      .withBatchSize(batchSize)
 
-    builder.setBolt("pushOutTruckingEvents", nifiBolt, taskCount)
+    builder.setBolt("outToNifi", nifiBolt, taskCount)
       .shuffleGrouping("joinTruckEvents")
   }
 }

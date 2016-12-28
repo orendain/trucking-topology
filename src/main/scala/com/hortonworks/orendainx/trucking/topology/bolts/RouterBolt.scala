@@ -3,8 +3,6 @@ package com.hortonworks.orendainx.trucking.topology.bolts
 import java.nio.charset.StandardCharsets
 import java.util
 
-import com.hortonworks.orendainx.trucking.shared.models.TruckingEvent
-import com.hortonworks.orendainx.trucking.shared.schemes.TruckingEventScheme
 import com.typesafe.scalalogging.Logger
 import org.apache.nifi.storm.NiFiDataPacket
 import org.apache.storm.task.{OutputCollector, TopologyContext}
@@ -22,28 +20,27 @@ import scala.collection.JavaConversions._
   */
 class RouterBolt() extends BaseWindowedBolt {
 
-  lazy val logger = Logger(this.getClass)
+  lazy val log = Logger(this.getClass)
 
   var outputCollector: OutputCollector = _
 
   override def prepare(stormConf: util.Map[_, _], context: TopologyContext, collector: OutputCollector): Unit = {
     outputCollector = collector
-    logger.info("Preparations finished")
   }
 
   override def execute(inputWindow: TupleWindow): Unit = {
-    logger.info("Executing")
+    log.info("Executing")
 
     // Extract all of the tuples from the TupleWindow and parse them into proper event classes
     //val geoEvents = inputWindow.get().map(TruckingEvent(_))
 
     inputWindow.get().foreach { tuple =>
-      logger.info(s"Raw: ${tuple.toString}")
+      log.info(s"Raw: ${tuple.toString}")
       val dp = tuple.getValueByField("nifiDataPacket").asInstanceOf[NiFiDataPacket]
-      logger.info(s"Attributs: ${dp.getAttributes}")
-      logger.info(s"Content: ${dp.getContent}")
+      log.info(s"Attributs: ${dp.getAttributes}")
+      log.info(s"Content: ${dp.getContent}")
       val contentStr = new String(dp.getContent, StandardCharsets.UTF_8)
-      logger.info(s"Content2: $contentStr")
+      log.info(s"Content2: $contentStr")
       outputCollector.emit(new Values(contentStr))
     }
 
@@ -62,9 +59,7 @@ class RouterBolt() extends BaseWindowedBolt {
   }
 
   override def declareOutputFields(declarer: OutputFieldsDeclarer): Unit = {
-    // Declare a stream with the default id and one with a custom id
     declarer.declare(new Fields("someField"))
     //declarer.declare(TruckingEventScheme.getOutputFields)
-    //declarer.declareStream("anomalousEvents", TruckingEventScheme.getOutputFields)
   }
 }
