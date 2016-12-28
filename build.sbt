@@ -1,43 +1,26 @@
 name := "trucking-topology"
 
-version := "0.1"
+version := "0.3"
 
 organization := "com.hortonworks.orendainx"
 
 scalaVersion := "2.11.8"
 
+// Needed until registry rebuilt w/o Scala version limitation
+resolvers += Resolver.mavenLocal
+
 libraryDependencies ++= Seq(
 
-  "com.hortonworks.orendainx" %% "trucking-shared" % "0.1",
+  "com.hortonworks.orendainx" %% "trucking-shared" % "0.3",
 
   "org.apache.nifi" % "nifi-storm-spout" % "1.1.0",
 
+  "com.hortonworks.registries" % "schema-registry-serdes" % "0.1.0-SNAPSHOT",
+
   // HDP will provide it's own Storm Jar, so we mark it as "provided"
   "org.apache.storm" % "storm-core" % "1.0.2" % "provided",
-  ("org.apache.storm" % "storm-kafka" % "1.0.2")
-      .exclude("org.slf4j", "slf4j-log4j12"),
-  ("org.apache.storm" % "storm-hbase" % "1.0.2").
-    exclude("org.apache.hbase", "hbase-client"). // temp
-    exclude("org.apache.hbase", "hbase-server"). // temp
-    exclude("asm", "asm").
-    exclude("log4j", "log4j").
-    exclude("org.mortbay.jetty", "jsp-2.1"). // vs tomcat:jasper-compiler in itself
-    exclude("org.mortbay.jetty", "servlet-api-2.5"). // vs javax.servlet:servlet-api:2.5 in itself and storm-core
-    exclude("org.mortbay.jetty", "jsp-api-2.1"), // vs javax.servlet.jsp:jsp-api:2.1 in itself
-
-  // Necessary as it is marked "provided" in storm-kafka and not bundled when assembled
-  ("org.apache.kafka" %% "kafka" % "0.10.1.0")
-      .exclude("log4j", "log4j")
-      .exclude("org.slf4j", "slf4j-log4j12"),
 
   "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0",
-
-  "org.apache.hbase" % "hbase" % "1.2.4",
-  ("org.apache.hbase" % "hbase-common" % "1.2.4"). // THIS
-    exclude("commons-beanutils", "commons-beanutils").
-    exclude("commons-beanutils", "commons-beanutils-core"),
-  ("org.apache.hbase" % "hbase-client" % "1.2.4")
-    .exclude("org.slf4j", "slf4j-log4j12"),
 
   ("org.apache.hadoop" % "hadoop-common" % "2.7.3")
     .exclude("commons-beanutils", "commons-beanutils")
